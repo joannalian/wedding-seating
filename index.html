@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="可離線使用、支援 Excel 群組匯入與拆分的婚宴排桌工具">
+  <title>好日子排桌</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .panel-heading-simple{display:block}
+    .guest-tools{background:#f8f2ec;border:1px solid #eaded4;border-radius:12px;padding:13px;margin:16px 0}
+    .guest-tools-title{font-size:12px;font-weight:800;color:#786a67;margin-bottom:9px}
+    .guest-tool-actions,.import-file-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .guest-tool-actions .button,.import-file-actions .button{text-align:center;text-decoration:none;padding:9px 8px}
+    .table-tools .table-settings-button{border:1px solid #dfd2c8;background:#fff;color:#6f5f5b;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:800}
+    .table-tools .table-settings-button:hover{border-color:#a94f58;color:#873943;background:#fff7f5}
+    .eyebrow,.pill,.group-meta,.group-badges,.badge,.person .flags{font-size:12px}
+    .brand p,.board-heading p,.hint,.stats span,.text-button,.capacity,.group-head,.person,.drop-hint,.dialog-card label,.dropzone p,.preview-table{font-size:12px}
+    .import-file-actions{display:block}
+    .import-file-actions .button{display:block;width:100%;font-size:14px;font-weight:800;padding:11px 16px}
+    .compact-table{min-height:0}
+    .compact-header{padding:11px 13px;display:grid;grid-template-columns:minmax(110px,1fr) auto auto;gap:14px}
+    .table-identity{min-width:0}.capacity-note{font-size:12px;color:#786a67;margin-top:2px}.capacity-note.extra{color:#c47b24}.capacity-note.full{color:#a63f3f}
+    .seat-count{display:flex;align-items:baseline;gap:3px;min-width:62px;color:#668575}.seat-count strong{font-family:serif;font-size:28px;line-height:1}.seat-count span{font-size:12px;font-weight:800}.seat-count em{font-size:12px;color:#c47b24;font-style:normal;margin-left:4px}.seat-count.extra{color:#c47b24}.seat-count.full{color:#a63f3f}
+    .compact-body{padding:7px 10px 10px;display:grid;gap:5px}.compact-group{display:grid;grid-template-columns:minmax(105px,145px) 1fr;gap:8px;align-items:center;border-bottom:1px solid #eee5dd;padding:5px 2px}.compact-group:last-child{border-bottom:0}.compact-group-head{display:flex;align-items:center;gap:6px;cursor:grab;min-width:0}.compact-group-head strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.compact-group-head>span:last-child{color:#786a67;margin-left:auto;white-space:nowrap;font-size:12px}.group-color-dot{width:10px;height:10px;border-radius:50%;background:var(--group-color);flex:0 0 auto}.compact-people{display:flex;gap:5px;flex-wrap:wrap}.compact-people .person{padding:5px 7px;border-left:4px solid var(--group-color)}.child-seat-badge{background:#fff0dc;color:#a65a00;border:1px solid #efbd75;border-radius:5px;padding:2px 5px;font-size:12px}.veg-badge{background:#e8f3eb;color:#47715b;border-radius:5px;padding:2px 5px;font-size:12px}.compact-drop{min-height:62px}
+    .table-board.map-view{grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:24px;padding:4px}.map-view .seating-map-card{border-radius:18px;aspect-ratio:auto;display:block;min-height:520px;padding:26px;background:#f9f4ee;overflow:visible}.round-layout{position:relative;width:min(430px,88vw);height:min(430px,88vw);margin:20px auto}.round-table{position:absolute;inset:20%;border-radius:50%;background:#fffdfa;border:8px solid #eaded4;box-shadow:0 12px 32px rgba(79,53,44,.13);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:42px 28px 28px;text-align:center}.map-settings{position:absolute;top:17px;right:50%;transform:translateX(50%);border:1px solid #dfd2c8;background:#fff;border-radius:8px;padding:6px 9px;color:#6f5f5b;font-weight:800;font-size:12px}.map-table-name{font-family:serif;font-size:20px;font-weight:800}.map-count{display:flex;align-items:baseline;gap:3px;margin-top:5px;color:#668575}.map-count strong{font-family:serif;font-size:38px;line-height:1}.map-count span{font-size:14px;font-weight:800}.map-count.extra{color:#c47b24}.map-count.full{color:#a63f3f}.map-limit{font-size:12px;color:#786a67;margin-top:3px}.map-legends{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:10px;max-height:86px;overflow:auto}.map-legend{display:flex;align-items:center;gap:4px;border:1px solid #e5dbd2;background:#fff;border-radius:6px;padding:3px 5px;cursor:grab}.map-legend>span{width:9px;height:9px;border-radius:50%}.map-legend b,.map-legend small{font-size:12px}.map-legend small{color:#786a67}.chair-wrap{position:absolute;left:50%;top:50%;width:86px;height:64px;margin-left:-43px;margin-top:-32px;transform:rotate(var(--angle)) translateY(-190px) rotate(calc(-1 * var(--angle)));display:grid;place-items:center}.map-chair{width:82px;min-height:55px;border-radius:12px;border:2px solid var(--seat-color);background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-shadow:0 4px 10px rgba(79,53,44,.08)}button.map-chair{cursor:grab}.map-chair.occupied{background:color-mix(in srgb,var(--seat-color) 20%,white);border-color:var(--seat-color)}.map-chair.baby-chair{border:3px solid #d98218;background:#fff0dc}.chair-icon{font-size:16px;line-height:1}.chair-name{font-size:12px;max-width:74px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}.map-chair.empty{color:#aa9d95;background:#f6f1ec;border-style:dashed}
+    .adult-chair-icon,.empty-chair-icon{position:relative;width:24px;height:18px;display:block}.adult-chair-icon::before,.empty-chair-icon::before{content:"";position:absolute;left:4px;top:0;width:16px;height:9px;border-radius:5px 5px 3px 3px;background:var(--seat-color)}.adult-chair-icon::after,.empty-chair-icon::after{content:"";position:absolute;left:2px;bottom:0;width:20px;height:8px;border:2px solid var(--seat-color);border-top-width:3px;border-radius:3px 3px 6px 6px;background:#fff}.empty-chair-icon::before{background:transparent;border:2px dashed var(--seat-color)}.empty-chair-icon::after{background:transparent;border-style:dashed}.baby-chair-icon{font-size:18px}.map-chair.baby-chair .chair-name{font-weight:800;color:#9b5200}
+    .category-summary{cursor:default}.category-summary>.category-dots{width:auto;height:auto;display:flex;gap:2px}.category-dots i{display:block;width:8px;height:8px;border-radius:50%}
+    .map-chair.baby-chair{border:2px solid var(--seat-color);background:color-mix(in srgb,var(--seat-color) 20%,white)}
+    .map-chair.baby-chair .chair-icon{width:25px;height:25px;border:2px solid var(--seat-color);border-radius:50%;background:#fff;display:grid;place-items:center;font-size:17px;line-height:1;outline:2px dotted var(--seat-color);outline-offset:2px;margin:3px 0 2px}
+    .map-chair.baby-chair .chair-name{font-weight:800;color:inherit}
+    .group-card-actions,.compact-group-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}.compact-group-actions{margin-left:auto}.delete-group-button{border:1px solid #e6caca;background:#fff;color:#a63f3f;border-radius:7px;padding:3px 7px;font-size:12px;font-weight:800}.delete-group-button:hover{background:#fff0f0;border-color:#c97979}.compact-delete-group{padding:2px 6px}.chair-flags{display:flex;align-items:center;justify-content:center;gap:5px;min-height:25px}.veg-chair-icon{width:25px;height:25px;border:2px solid var(--seat-color);border-radius:50%;background:#fff;display:grid;place-items:center;font-size:16px;line-height:1;outline:2px dotted var(--seat-color);outline-offset:2px;margin:3px 0 2px}.map-chair.veg-chair .chair-name{font-weight:800}.map-chair.baby-chair .chair-flags .chair-icon{margin:3px 0 2px}.map-chair.baby-chair.veg-chair .chair-flags{gap:8px}.round-table .map-legends{max-height:none;overflow:visible;display:grid;grid-template-columns:repeat(2,max-content);justify-content:center;gap:4px}.round-table .map-legends.many-categories{gap:2px 3px}.round-table .map-legends.many-categories .map-legend{padding:2px 4px}.round-table .map-legends.many-categories .map-legend b,.round-table .map-legends.many-categories .map-legend small{font-size:12px}
+    .map-tools{margin:-5px 0 16px;background:#fffdfa;border:1px solid #e7ddd4;border-radius:13px;padding:11px 13px}.map-tool-actions{display:flex;gap:8px;flex-wrap:wrap}.unplaced-panel{display:flex;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #eee5dd}.unplaced-panel>strong{white-space:nowrap}.unplaced-panel>span{font-size:12px;color:#786a67}.unplaced-list{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}.unplaced-table{border:1px solid #d9cbc0;background:#fff;border-radius:8px;padding:6px 9px;font-weight:800;color:#6f5f5b}.unplaced-table:hover{border-color:#a94f58;color:#873943}.table-board.map-view.venue-mode{display:block;position:relative;min-height:760px;border:1px solid #d9cbc0;border-radius:16px;background-color:#eee7df;background-size:contain;background-position:center;background-repeat:no-repeat;overflow:hidden}.venue-mode .seating-map-card{position:absolute;width:470px;min-height:520px;margin:0;transform:translate(-50%,-50%) scale(.68);transform-origin:center;box-shadow:0 18px 45px rgba(65,43,35,.18)}.map-move-handle{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;border:1px solid #d9cbc0;background:#382d2b;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:800;cursor:move;white-space:nowrap}.venue-empty{position:absolute;inset:0;display:grid;place-items:center;color:#786a67;background:rgba(255,253,250,.5);text-align:center;padding:30px}
+    .venue-mode .venue-marker{position:absolute;width:170px;height:170px;min-height:0;margin:0;transform:translate(-50%,-50%);border-radius:50%;background:rgba(255,253,250,.94);border:4px solid #668575;box-shadow:0 8px 24px rgba(65,43,35,.22);overflow:visible;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:17px 9px 28px;backdrop-filter:blur(3px)}.venue-mode .venue-marker.extra{border-color:#c47b24}.venue-mode .venue-marker.full{border-color:#a63f3f}.venue-marker-settings{position:absolute;right:9px;top:9px;width:28px;height:28px;border-radius:50%;border:1px solid #dfd2c8;background:#fff;color:#6f5f5b;font-size:12px}.venue-marker-name{font-family:serif;font-size:16px;font-weight:800;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.venue-marker-count{display:flex;align-items:baseline;color:#668575}.venue-marker-count strong{font-family:serif;font-size:29px;line-height:1}.venue-marker-count span{font-size:13px;font-weight:800}.venue-marker.extra .venue-marker-count{color:#c47b24}.venue-marker.full .venue-marker-count{color:#a63f3f}.venue-marker-note{font-size:12px;color:#786a67}.venue-child{position:absolute;left:-8px;top:7px;background:#fff;border:2px dotted #c47b24;border-radius:99px;padding:3px 6px;font-size:12px;font-weight:800}.venue-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-content:center;gap:2px 3px;width:150px;margin-top:3px}.venue-category-chip{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0;border:1px solid #e2d7cf;background:#fff;border-radius:5px;padding:1px 3px;line-height:1.2}.venue-category-chip:only-child{grid-column:1/-1;justify-self:center;min-width:84px}.venue-category-chip b,.venue-category-chip small{font-size:12px}.venue-category-chip b{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.venue-category-chip small{color:#786a67;flex:0 0 auto}.venue-category-colors{display:flex;flex:0 0 auto}.venue-category-colors i{width:7px;height:7px;border-radius:50%;display:block;margin-left:-2px}.venue-category-colors i:first-child{margin-left:0}.venue-marker .map-move-handle{bottom:-13px;padding:5px 8px}.venue-mode .venue-empty{z-index:0}
+    @media(max-width:420px){.guest-tool-actions,.import-file-actions{grid-template-columns:1fr}}
+    @media(max-width:700px){.compact-header{grid-template-columns:1fr auto}.compact-header .table-tools{grid-column:1/-1}.compact-group{grid-template-columns:1fr}.table-board.map-view{grid-template-columns:1fr}.map-view .seating-map-card{min-height:430px;padding:8px}.round-layout{transform:scale(.82);transform-origin:top center;margin-bottom:-70px}}
+  </style>
+  <style>
+    .venue-start{min-height:560px;display:grid!important;place-items:center;border:1px dashed #d9cbc0;border-radius:16px;background:#fffaf6}.venue-start-message{text-align:center;color:#786a67;line-height:1.7}.venue-start-message strong{display:block;font-family:serif;font-size:21px;color:#382d2b}.venue-mode.quick-place{cursor:crosshair;outline:3px solid rgba(169,79,88,.25)}.venue-mode.quick-place::after{content:"點一下底圖，依序放置未定位桌次";position:absolute;left:50%;top:14px;transform:translateX(-50%);background:#382d2b;color:#fff;border-radius:99px;padding:8px 14px;font-size:12px;font-weight:800;z-index:8}.venue-marker{cursor:pointer}.venue-marker::after{content:"雙擊查看座位";position:absolute;left:50%;top:100%;transform:translate(-50%,7px);background:#382d2b;color:#fff;border-radius:6px;padding:4px 7px;font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:.15s}.venue-marker:hover::after{opacity:1}.seat-preview-shell{width:min(620px,calc(100vw - 24px));background:#f9f4ee;border-radius:20px;padding:14px;position:relative}.seat-preview-close{position:absolute;right:12px;top:10px;z-index:10}.seat-preview-tip{text-align:center;color:#786a67;font-size:12px;padding:3px 45px 8px}.seat-preview-shell .seating-map-card{box-shadow:none;border:0;background:transparent;min-height:520px}.seat-preview-shell .round-layout{margin:10px auto}
+  </style>
+  <style>.map-extra-seat{margin-top:6px;border:1px dashed #c47b24;background:#fff6e8;color:#a65a00;border-radius:99px;padding:3px 8px;font-size:12px;font-weight:800}.table-card.drop-extra .map-extra-seat,.table-card.drop-comfort .map-extra-seat{background:#c47b24;color:#fff;border-style:solid;box-shadow:0 0 0 4px rgba(196,123,36,.16)}</style>
+  <style>.category-first-body{gap:8px}.category-block{border:1px solid #e7ddd4;border-radius:10px;overflow:hidden;background:#fff}.category-block-header{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eee6df;padding:7px 10px}.category-block-header strong{font-size:14px;color:#382d2b}.category-block-header span{font-size:12px;color:#786a67;font-weight:800}.category-group-list{padding:1px 7px}.category-group-list .compact-group:last-child{border-bottom:0}</style>
+  <style>
+    @media(min-width:761px){.guest-panel{position:sticky;top:78px;height:calc(100vh - 78px);align-self:start;display:flex;flex-direction:column;overflow:hidden;z-index:12}.guest-panel .waiting-list{flex:1;min-height:120px;max-height:none;overflow-y:auto;overscroll-behavior:contain;padding-right:6px}.guest-panel .add-manual{flex:0 0 auto}.waiting-list::-webkit-scrollbar{width:8px}.waiting-list::-webkit-scrollbar-track{background:#f4eee8;border-radius:99px}.waiting-list::-webkit-scrollbar-thumb{background:#cdbeb4;border-radius:99px}}
+  </style>
+  <style>
+    .venue-background-image{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0;pointer-events:none}.venue-mode .venue-marker{z-index:2}
+    @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.stats,.board-heading p,.board-heading .eyebrow,.map-tools,.map-move-handle,.venue-marker-settings,.map-settings,.seat-preview-tip{display:none!important}.board-heading{margin:0 0 8px}.board-heading h2{font-size:18px}.board-panel{padding:0!important}.table-board.venue-mode{width:100%!important;min-height:0!important;overflow:hidden!important;background:none!important}.venue-background-image{display:block!important;object-fit:contain!important}.venue-mode .venue-marker{transform:translate(-50%,-50%) scale(.58)!important;box-shadow:none!important}.venue-marker::after{display:none!important}@page{size:A4 landscape;margin:8mm}}
+  </style>
+  <style>
+    @media print{html,body{margin:0!important;padding:0!important;width:100%!important;height:auto!important}.workspace{display:block!important;min-height:0!important}.board-heading{display:none!important}.board-panel{width:100%!important;padding:0!important;margin:0!important}.table-board.venue-mode{display:block!important;height:170mm!important;width:min(100%,calc(170mm * var(--venue-aspect)))!important;margin:0 auto!important;min-height:0!important;break-inside:avoid-page!important;page-break-inside:avoid!important;page-break-before:avoid!important;page-break-after:avoid!important}.venue-background-image{object-fit:fill!important}.venue-mode .venue-marker{transform:translate(-50%,-50%) scale(.52)!important;transform-origin:center!important}@page{size:A4 landscape;margin:5mm}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">囍</span><div><h1>好日子排桌</h1><p>名單只留在這台裝置</p></div></div>
+    <div class="view-tabs" role="tablist">
+      <button class="tab active" data-view="list">列表排桌</button>
+      <button class="tab" data-view="map">座位圖</button>
+      <button class="tab" data-view="venue">場地配置</button>
+    </div>
+    <div class="header-actions">
+      <button class="button ghost" id="printBtn">匯出 PDF</button>
+      <button class="button ghost" id="backupBtn">下載備份</button>
+      <label class="button ghost file-label">讀取備份<input id="backupInput" type="file" accept=".json"></label>
+      <button class="button primary" id="exportBtn">匯出 Excel</button>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="座位統計">
+    <article><span>賓客總數</span><strong id="statTotal">0</strong></article>
+    <article><span>已安排</span><strong id="statAssigned">0</strong></article>
+    <article><span>待安排</span><strong id="statWaiting">0</strong></article>
+    <article><span>舒適座位</span><strong id="statComfort">22</strong></article>
+    <article><span>最大容量</span><strong id="statHard">23</strong></article>
+    <article class="extra-stat"><span>已用加位</span><strong id="statExtra">0</strong></article>
+  </section>
+
+  <main class="workspace">
+    <aside class="guest-panel">
+      <div class="panel-heading panel-heading-simple"><div><p class="eyebrow">尚未入席</p><h2>待分配群組 <span id="waitingBadge">0</span></h2></div></div>
+      <div class="guest-tools">
+        <div class="guest-tools-title">名單工具</div>
+        <div class="guest-tool-actions"><button class="button primary" id="openImportBtn">匯入 Excel</button><a class="button ghost" href="排桌匯入檔範例.xlsx" download="排桌匯入檔範例.xlsx">下載範例</a></div>
+      </div>
+      <label class="search"><span>搜尋</span><input id="searchInput" placeholder="群組、分類或姓名"></label>
+      <div class="filter-row"><select id="categoryFilter"><option value="">全部分類</option></select><button class="text-button danger" id="clearBtn">清除全部</button></div>
+      <div id="waitingList" class="waiting-list"></div>
+      <button class="add-manual" id="manualBtn">＋ 手動新增群組</button>
+    </aside>
+
+    <section class="board-panel">
+      <div class="board-heading"><div><p class="eyebrow">拖曳即可移動</p><h2>桌次配置</h2><p>拖姓名移動單人；拖群組標題移動整組。</p></div><button class="button secondary" id="addTableBtn">＋ 新增桌次</button></div>
+      <div id="mapTools" class="map-tools" hidden>
+        <div class="map-tool-actions"><label class="button primary file-label">上傳場地底圖<input id="venueImageInput" type="file" accept="image/png,image/jpeg,image/webp"></label><button class="button secondary" id="quickPlaceBtn">快速標記桌位</button><button class="button ghost" id="toggleBackgroundBtn">隱藏底圖</button><button class="button ghost" id="clearBackgroundBtn">移除底圖</button></div>
+        <div id="unplacedPanel" class="unplaced-panel"><strong>未放置桌次</strong><span id="unplacedHint">上傳場地底圖後，可將桌次放到正確位置。</span><div id="unplacedTables" class="unplaced-list"></div></div>
+      </div>
+      <div id="tableBoard" class="table-board list-view"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="importDialog">
+    <form method="dialog" class="dialog-card wide">
+      <div class="dialog-title"><div><p class="eyebrow">Excel 匯入</p><h2>加入賓客群組</h2></div><button class="icon-button close-dialog" value="cancel" aria-label="關閉">×</button></div>
+      <div class="dropzone" id="dropzone"><strong>選擇或拖入 Excel 檔案</strong><p>支援 .xlsx；資料只在瀏覽器內解析，不會上傳。</p><div class="import-file-actions"><label class="button primary file-label">選擇檔案<input id="excelInput" type="file" accept=".xlsx"></label></div></div>
+      <div id="importPreview" class="import-preview empty">尚未選擇檔案</div>
+      <div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="confirmImportBtn" class="button primary" disabled>確認匯入</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="tableDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2 id="tableDialogTitle">桌次設定</h2><button class="icon-button" value="cancel">×</button></div><label>桌名<input id="tableName"></label><div class="two-cols"><label>舒適人數<input id="comfortLimit" type="number" min="1"></label><label>絕對上限<input id="hardLimit" type="number" min="1"></label></div><p class="hint">超過舒適人數會提醒；絕對上限不能超過。</p><div class="dialog-actions"><button type="button" id="deleteTableBtn" class="button ghost" style="margin-right:auto;color:#a63f3f">刪除桌次</button><button value="cancel" class="button ghost">取消</button><button type="button" id="saveTableBtn" class="button primary">儲存</button></div></form></dialog>
+
+  <dialog id="splitDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>安排部分成員</h2><button class="icon-button" value="cancel">×</button></div><p id="splitMessage"></p><div class="capacity-options" id="capacityOptions"></div><label>自訂安排人數<input id="splitCount" type="number" min="1"></label><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="confirmSplitBtn" class="button primary">確認安排</button></div></form></dialog>
+
+  <dialog id="manualDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>新增群組</h2><button class="icon-button" value="cancel">×</button></div><label>分類<input id="manualCategory" placeholder="例如：共同好友"></label><label>群組名稱<input id="manualName" placeholder="例如：同事朋友"></label><div class="two-cols"><label>人數<input id="manualCount" type="number" min="1" value="1"></label><label>備註<input id="manualNote"></label></div><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="saveManualBtn" class="button primary">新增</button></div></form></dialog>
+
+  <dialog id="personDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>編輯賓客</h2><button class="icon-button" value="cancel">×</button></div><label>顯示姓名<input id="personName"></label><div class="two-cols"><label><input id="personChild" type="checkbox" style="width:auto"> 需要兒童座椅</label><label><input id="personVeg" type="checkbox" style="width:auto"> 素食</label></div><div class="dialog-actions"><button type="button" id="returnWaitingBtn" class="button ghost" style="margin-right:auto">移回待分配</button><button value="cancel" class="button ghost">取消</button><button type="button" id="savePersonBtn" class="button primary">儲存</button></div></form></dialog>
+
+  <dialog id="seatPreviewDialog"><div class="seat-preview-shell"><button class="icon-button seat-preview-close" id="closeSeatPreviewBtn" aria-label="關閉">×</button><p class="seat-preview-tip">大型座位圖｜可拖曳賓客，完成後關閉即可回到場地配置</p><div id="seatPreviewContent"></div></div></dialog>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
+  <script src="app.js?v=20260831-4"></script>
+</body>
+</html>
