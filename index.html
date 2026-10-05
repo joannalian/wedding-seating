@@ -6,6 +6,7 @@
   <meta name="description" content="可離線使用、支援 Excel 群組匯入與拆分的婚宴排桌工具">
   <title>好日子排桌</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="mobile.css">
   <style>
     .panel-heading-simple{display:block}
     .guest-tools{background:#f8f2ec;border:1px solid #eaded4;border-radius:12px;padding:13px;margin:16px 0}
@@ -62,10 +63,12 @@
       <button class="tab" data-view="venue">場地配置</button>
     </div>
     <div class="header-actions">
+      <button class="button ghost" id="imageExportBtn">匯出圖片</button>
       <button class="button ghost" id="printBtn">匯出 PDF</button>
       <button class="button ghost" id="backupBtn">下載備份</button>
       <label class="button ghost file-label">讀取備份<input id="backupInput" type="file" accept=".json"></label>
       <button class="button primary" id="exportBtn">匯出 Excel</button>
+      <button class="button ghost mobile-tools-button" id="mobileToolsBtn" type="button">工具</button>
     </div>
   </header>
 
@@ -101,6 +104,9 @@
     </section>
   </main>
 
+  <button class="mobile-waiting-button" id="mobileWaitingBtn" type="button">待分配 <strong id="mobileWaitingCount">0</strong> 人</button>
+  <button class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" type="button" aria-label="關閉待分配名單"></button>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <dialog id="importDialog">
@@ -118,12 +124,17 @@
 
   <dialog id="manualDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>新增群組</h2><button class="icon-button" value="cancel">×</button></div><label>分類<input id="manualCategory" placeholder="例如：共同好友"></label><label>群組名稱<input id="manualName" placeholder="例如：同事朋友"></label><div class="two-cols"><label>人數<input id="manualCount" type="number" min="1" value="1"></label><label>備註<input id="manualNote"></label></div><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="saveManualBtn" class="button primary">新增</button></div></form></dialog>
 
-  <dialog id="personDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>編輯賓客</h2><button class="icon-button" value="cancel">×</button></div><label>顯示姓名<input id="personName"></label><div class="two-cols"><label><input id="personChild" type="checkbox" style="width:auto"> 需要兒童座椅</label><label><input id="personVeg" type="checkbox" style="width:auto"> 素食</label></div><div class="dialog-actions"><button type="button" id="returnWaitingBtn" class="button ghost" style="margin-right:auto">移回待分配</button><button value="cancel" class="button ghost">取消</button><button type="button" id="savePersonBtn" class="button primary">儲存</button></div></form></dialog>
+  <dialog id="personDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>編輯賓客</h2><button class="icon-button" value="cancel">×</button></div><label>顯示姓名<input id="personName"></label><div class="two-cols"><label><input id="personChild" type="checkbox" style="width:auto"> 需要兒童座椅</label><label><input id="personVeg" type="checkbox" style="width:auto"> 素食</label></div><label>移動到<select id="personTableTarget" class="dialog-select"></select></label><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="savePersonBtn" class="button primary">儲存</button></div></form></dialog>
+
+  <dialog id="groupMoveDialog"><form method="dialog" class="dialog-card mobile-sheet"><div class="dialog-title"><div><p class="eyebrow">群組操作</p><h2 id="groupMoveTitle">移動群組</h2></div><button class="icon-button" value="cancel">×</button></div><p class="hint" id="groupMoveHint"></p><label>移動到<select id="groupTableTarget" class="dialog-select"></select></label><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="confirmGroupMoveBtn" class="button primary">確認移動</button></div></form></dialog>
+
+  <dialog id="mobileToolsDialog"><div class="dialog-card mobile-sheet"><div class="dialog-title"><div><p class="eyebrow">手機工具</p><h2>資料與匯出</h2></div><button class="icon-button" id="closeMobileToolsBtn" type="button" aria-label="關閉">×</button></div><p class="device-note">資料只存在目前這台裝置，不會和電腦自動同步。</p><p class="device-updated" id="deviceUpdatedAt">尚未儲存資料</p><div class="mobile-tool-grid"><button class="button primary" id="mobileImportBtn" type="button">匯入／同步 Excel</button><button class="button ghost" id="mobileBackupBtn" type="button">下載 JSON 備份</button><button class="button ghost" id="mobileRestoreBtn" type="button">讀取 JSON 備份</button><button class="button ghost" id="mobileImageBtn" type="button">匯出圖片</button><button class="button ghost" id="mobilePdfBtn" type="button">匯出 PDF</button><button class="button ghost" id="mobileExcelBtn" type="button">匯出 Excel</button></div></div></dialog>
 
   <dialog id="seatPreviewDialog"><div class="seat-preview-shell"><button class="icon-button seat-preview-close" id="closeSeatPreviewBtn" aria-label="關閉">×</button><p class="seat-preview-tip">大型座位圖｜可拖曳賓客，完成後關閉即可回到場地配置</p><div id="seatPreviewContent"></div></div></dialog>
 
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/jszip.min.js"></script>
-  <script src="app.js?v=20260917-3"></script>
+  <script src="vendor/html2canvas.min.js"></script>
+  <script src="app.js?v=20261005-2"></script>
 </body>
 </html>

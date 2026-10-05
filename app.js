@@ -9,10 +9,12 @@ let state = load() || {
     {id:uid(),name:'第 2 桌',comfort:10,hard:11}
   ], view:'list', map:{background:null,hidden:false}
 };
-let importRows = [], importPlan = null, editingTableId = null, editingMemberId = null, pendingMove = null, lastUndo = null, quickPlaceMode = false, previewTableId = null, mapAspectLoading = false;
+let importRows = [], importPlan = null, editingTableId = null, editingMemberId = null, editingGroupMove = null, pendingMove = null, lastUndo = null, quickPlaceMode = false, previewTableId = null, mapAspectLoading = false;
 
 function load(){try{return JSON.parse(localStorage.getItem(key))}catch{return null}}
-function persist(){try{localStorage.setItem(key,JSON.stringify(state))}catch{toast('場地圖或資料較大，瀏覽器儲存空間不足；請先下載備份。')}}
+function persist(){try{state.meta=state.meta||{};state.meta.updatedAt=new Date().toISOString();localStorage.setItem(key,JSON.stringify(state));updateDeviceTime()}catch{toast('場地圖或資料較大，瀏覽器儲存空間不足；請先下載備份。')}}
+function updateDeviceTime(){const el=$('#deviceUpdatedAt');if(!el)return;const value=state.meta?.updatedAt;el.textContent=value?`本機資料儲存時間：${new Date(value).toLocaleString('zh-TW')}`:'尚未儲存資料'}
+function tableOptions(selected){return `<option value="">待分配</option>`+state.tables.map(t=>`<option value="${t.id}" ${t.id===selected?'selected':''}>${esc(t.name)}（${tableCount(t.id)}/${t.hard}）</option>`).join('')}
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 // Return the actual member objects so drag, edit, undo and table counts share one source of truth.
 function members(){return state.groups.flatMap(g=>g.members)}
@@ -25,6 +27,7 @@ function deleteGroup(id){
   state.groups=state.groups.filter(g=>g.id!==id);render();toast(`已刪除群組「${group.name}」`);
 }
 function bindGroupDeleteButtons(){document.querySelectorAll('[data-delete-group]').forEach(button=>button.onclick=e=>{e.preventDefault();e.stopPropagation();deleteGroup(button.dataset.deleteGroup)})}
+function bindGroupActions(){document.querySelectorAll('[data-group-action]').forEach(element=>element.onclick=e=>{if(e.target.closest('button,[data-edit-member]'))return;openGroupMoveDialog(element.dataset.groupAction,element.dataset.sourceTable||null)})}
 function groupColor(group){
   if(group.color)return group.color;
   const index=Math.max(0,state.groups.indexOf(group));
@@ -45,7 +48,7 @@ function render(){
   const extra=state.tables.reduce((s,t)=>s+Math.max(0,tableCount(t.id)-t.comfort),0);
   $('#statTotal').textContent=total; $('#statAssigned').textContent=assigned; $('#statWaiting').textContent=total-assigned;
   $('#statComfort').textContent=comfort; $('#statHard').textContent=hard; $('#statExtra').textContent=extra;
-  $('#waitingBadge').textContent=state.groups.filter(g=>groupUnassigned(g).length).length;
+  const waitingPeople=all.length-assigned;$('#waitingBadge').textContent=state.groups.filter(g=>groupUnassigned(g).length).length;$('#mobileWaitingCount').textContent=waitingPeople;
   renderCategories(); renderWaiting(); renderTables(); persist();
 }
 function renderCategories(){
@@ -57,13 +60,14 @@ function renderWaiting(){
   const rows=state.groups.filter(g=>groupUnassigned(g).length).filter(g=>(!cat||g.category===cat)&&(!q||`${g.name} ${g.category} ${g.members.map(m=>m.name).join(' ')}`.toLowerCase().includes(q)));
   $('#waitingList').innerHTML=rows.length?rows.map(g=>{
     const waiting=groupUnassigned(g), assigned=g.members.length-waiting.length;
-    return `<article class="group-card" draggable="true" data-drag-group="${g.id}" style="--cat:${groupColor(g)}">
+    return `<article class="group-card" draggable="true" data-drag-group="${g.id}" data-group-action="${g.id}" data-source-table="" style="--cat:${groupColor(g)}">
       <div class="group-top"><span class="group-name">${esc(g.name)}</span><span class="group-card-actions"><span class="pill">${waiting.length} 位</span><button type="button" class="delete-group-button" data-delete-group="${g.id}" title="刪除整個群組">刪除</button></span></div>
       <div class="group-meta">${esc(g.category)}${assigned?` · 已安排 ${assigned}/${g.members.length}`:''}</div>
       <div class="group-badges">${waiting.filter(m=>m.child).length?`<span class="badge">兒童椅 ${waiting.filter(m=>m.child).length}</span>`:''}${waiting.filter(m=>m.veg).length?`<span class="badge">素食 ${waiting.filter(m=>m.veg).length}</span>`:''}${g.note?`<span class="badge">${esc(g.note)}</span>`:''}</div>
     </article>`}).join(''):'<div class="empty-state">目前沒有待分配群組。<br>可匯入 Excel 或手動新增。</div>';
   bindDrags();
   bindGroupDeleteButtons();
+  bindGroupActions();
   const waiting=$('#waitingList');waiting.ondragover=e=>e.preventDefault();waiting.ondrop=e=>{e.preventDefault();try{const p=JSON.parse(e.dataTransfer.getData('application/json'));applyMove(p.memberIds,null)}catch{toast('無法辨識拖曳內容')}};
 }
 function renderTables(){
@@ -86,6 +90,7 @@ function renderTables(){
   document.querySelectorAll('[data-edit-table]').forEach(b=>b.onclick=()=>openTableDialog(b.dataset.editTable));
   document.querySelectorAll('[data-edit-member]').forEach(b=>b.onclick=()=>openPersonDialog(b.dataset.editMember));
   bindGroupDeleteButtons();
+  bindGroupActions();
   document.querySelectorAll('[data-venue-marker]').forEach(m=>m.ondblclick=e=>{if(e.target.closest('button'))return;openSeatPreview(m.dataset.venueMarker)});
   board.onclick=e=>{if(!quickPlaceMode||!venueMode||e.target.closest('.venue-marker'))return;const t=state.tables.find(x=>!Number.isFinite(x.mapX)||!Number.isFinite(x.mapY));if(!t){quickPlaceMode=false;render();return toast('所有桌次都已放置')};const rect=board.getBoundingClientRect();t.mapX=Math.max(4,Math.min(96,(e.clientX-rect.left)/rect.width*100));t.mapY=Math.max(5,Math.min(95,(e.clientY-rect.top)/rect.height*100));if(!state.tables.some(x=>!Number.isFinite(x.mapX)||!Number.isFinite(x.mapY)))quickPlaceMode=false;render();toast(`已放置「${t.name}」`)};
 }
@@ -94,7 +99,7 @@ function renderListTable(t){
     const gs=state.groups.map(g=>({g,ms:g.members.filter(m=>m.tableId===t.id)})).filter(x=>x.ms.length);
     const categoryMap=new Map();gs.forEach(item=>{const c=categoryMap.get(item.g.category)||{name:item.g.category,groups:[],count:0};c.groups.push(item);c.count+=item.ms.length;categoryMap.set(item.g.category,c)});const categorySections=[...categoryMap.values()];
     return `<article class="table-card compact-table" data-table-id="${t.id}"><header class="table-header compact-header"><div class="table-identity"><div class="table-title">${esc(t.name)}</div><div class="capacity-note ${capClass}">舒適 ${t.comfort} · 上限 ${t.hard}</div></div><div class="seat-count ${capClass}"><strong>${count}</strong><span>人</span>${count>t.comfort?`<em>加位 ${count-t.comfort}</em>`:''}</div><div class="table-tools"><button class="table-settings-button" data-edit-table="${t.id}" title="設定桌名與座位容量">⚙ 桌次設定</button></div></header>
-      <div class="compact-body category-first-body">${categorySections.length?categorySections.map(c=>`<section class="category-block"><header class="category-block-header"><strong>${esc(c.name)}</strong><span>${c.count} 位 · ${c.groups.length} 個群組</span></header><div class="category-group-list">${c.groups.map(({g,ms})=>`<section class="compact-group" style="--group-color:${groupColor(g)}"><div class="compact-group-head" draggable="true" data-drag-seated-group="${g.id}" data-table="${t.id}"><span class="group-color-dot"></span><strong>${esc(g.name)}</strong><span class="compact-group-actions"><span>${ms.length} 位</span><button type="button" class="delete-group-button compact-delete-group" data-delete-group="${g.id}" title="刪除整個群組">刪除</button></span></div><div class="compact-people">${ms.map(m=>`<div class="person ${m.child?'has-child-seat':''}" draggable="true" data-drag-member="${m.id}" data-edit-member="${m.id}" title="拖曳移動；點一下編輯"><span>${esc(m.name)}</span>${m.child?'<b class="child-seat-badge">👶 嬰兒椅</b>':''}${m.veg?'<b class="veg-badge">🥬 素食</b>':''}</div>`).join('')}</div></section>`).join('')}</div></section>`).join(''):'<div class="drop-hint compact-drop">將群組或賓客拖到這裡</div>'}</div></article>`;
+      <div class="compact-body category-first-body">${categorySections.length?categorySections.map(c=>`<section class="category-block"><header class="category-block-header"><strong>${esc(c.name)}</strong><span>${c.count} 位 · ${c.groups.length} 個群組</span></header><div class="category-group-list">${c.groups.map(({g,ms})=>`<section class="compact-group" style="--group-color:${groupColor(g)}"><div class="compact-group-head" draggable="true" data-drag-seated-group="${g.id}" data-table="${t.id}" data-group-action="${g.id}" data-source-table="${t.id}"><span class="group-color-dot"></span><strong>${esc(g.name)}</strong><span class="compact-group-actions"><span>${ms.length} 位</span><button type="button" class="delete-group-button compact-delete-group" data-delete-group="${g.id}" title="刪除整個群組">刪除</button></span></div><div class="compact-people">${ms.map(m=>`<div class="person ${m.child?'has-child-seat':''}" draggable="true" data-drag-member="${m.id}" data-edit-member="${m.id}" title="拖曳移動；點一下編輯"><span>${esc(m.name)}</span>${m.child?'<b class="child-seat-badge">👶 嬰兒椅</b>':''}${m.veg?'<b class="veg-badge">🥬 素食</b>':''}</div>`).join('')}</div></section>`).join('')}</div></section>`).join(''):'<div class="drop-hint compact-drop">將群組或賓客拖到這裡</div>'}</div></article>`;
 }
 function renderMapTable(t,venueMode=false){
   const count=tableCount(t.id), seated=state.groups.flatMap(g=>g.members.filter(m=>m.tableId===t.id).map(m=>({m,g}))), capClass=count>=t.hard?'full':count>t.comfort?'extra':'';
@@ -140,6 +145,7 @@ function bindDrops(){document.querySelectorAll('.table-card').forEach(card=>{
   card.ondrop=e=>{e.preventDefault();card.classList.remove('drop-full','drop-extra','drop-comfort');try{requestMove(JSON.parse(e.dataTransfer.getData('application/json')),card.dataset.tableId)}catch{toast('無法辨識拖曳內容')}};
 })}
 function requestMove(payload,tableId){
+  if(!tableId){const moving=payload.memberIds.map(id=>members().find(m=>m.id===id)).filter(m=>m&&m.tableId);if(!moving.length)return toast('這些賓客已在待分配');return applyMove(moving.map(m=>m.id),null)}
   const t=state.tables.find(x=>x.id===tableId), moving=payload.memberIds.map(id=>members().find(m=>m.id===id)).filter(Boolean).filter(m=>m.tableId!==tableId);
   if(!moving.length)return toast('這些賓客已經在此桌');
   const current=tableCount(tableId), hardRoom=Math.max(0,t.hard-current), comfortRoom=Math.max(0,t.comfort-current);
@@ -165,9 +171,11 @@ $('#saveTableBtn').onclick=()=>{const name=$('#tableName').value.trim(),comfort=
 $('#addTableBtn').onclick=()=>openTableDialog();
 $('#deleteTableBtn').onclick=()=>{if(state.tables.length===1)return toast('至少要保留一桌');const t=state.tables.find(x=>x.id===editingTableId);if(confirm(`確定刪除「${t.name}」？桌內賓客會移回待分配。`)){members().filter(m=>m.tableId===t.id).forEach(m=>m.tableId=null);state.tables=state.tables.filter(x=>x.id!==t.id);$('#tableDialog').close();render();toast('桌次已刪除')}};
 
-function openPersonDialog(id){editingMemberId=id;const m=members().find(x=>x.id===id);$('#personName').value=m.name;$('#personChild').checked=m.child;$('#personVeg').checked=m.veg;$('#personDialog').showModal()}
-$('#savePersonBtn').onclick=()=>{const m=members().find(x=>x.id===editingMemberId),name=$('#personName').value.trim();if(!name)return toast('姓名不可空白');Object.assign(m,{name,child:$('#personChild').checked,veg:$('#personVeg').checked});$('#personDialog').close();render();toast('賓客資料已更新')};
-$('#returnWaitingBtn').onclick=()=>{$('#personDialog').close();applyMove([editingMemberId],null)};
+function openPersonDialog(id){editingMemberId=id;const m=members().find(x=>x.id===id);$('#personName').value=m.name;$('#personChild').checked=m.child;$('#personVeg').checked=m.veg;$('#personTableTarget').innerHTML=tableOptions(m.tableId||'');$('#personDialog').showModal()}
+$('#savePersonBtn').onclick=()=>{const m=members().find(x=>x.id===editingMemberId),name=$('#personName').value.trim(),target=$('#personTableTarget').value||null;if(!name)return toast('姓名不可空白');Object.assign(m,{name,child:$('#personChild').checked,veg:$('#personVeg').checked});$('#personDialog').close();if(target!==m.tableId)requestMove({type:'member',memberIds:[m.id]},target);else{render();toast('賓客資料已更新')}};
+
+function openGroupMoveDialog(groupId,sourceTable){const group=state.groups.find(g=>g.id===groupId);if(!group)return;const movable=sourceTable?group.members.filter(m=>m.tableId===sourceTable):groupUnassigned(group);if(!movable.length)return toast('這個位置沒有可移動的成員');editingGroupMove={groupId,sourceTable,memberIds:movable.map(m=>m.id)};$('#groupMoveTitle').textContent=group.name;$('#groupMoveHint').textContent=`這次會移動 ${movable.length} 位；若座位不足，仍會先顯示拆分或加位提醒。`;$('#groupTableTarget').innerHTML=tableOptions(sourceTable||'');$('#groupMoveDialog').showModal()}
+$('#confirmGroupMoveBtn').onclick=()=>{if(!editingGroupMove)return;const target=$('#groupTableTarget').value||null,payload={type:'group',groupId:editingGroupMove.groupId,memberIds:editingGroupMove.memberIds};$('#groupMoveDialog').close();editingGroupMove=null;requestMove(payload,target)};
 
 function normalizeGroupName(value){return String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('zh-TW')}
 function importRow(raw){const countValue=raw['人數'],count=String(countValue??'').trim()===''?NaN:Number(countValue);return {category:String(raw['分類']||'未分類').trim(),name:String(raw['誰']||'').trim(),count,note:String(raw['備註']||''),child:Number(raw['兒童座椅'])||0,veg:Number(raw['素食幾份'])||0,cnCake:Number(raw['中式喜餅數量'])||0,westCake:Number(raw['西式喜餅數量'])||0}}
@@ -223,36 +231,104 @@ $('#quickPlaceBtn').onclick=()=>{if(!state.map.background)return toast('請先�
 $('#clearBackgroundBtn').onclick=()=>{if(confirm('確定移除場地底圖？桌次與賓客不會刪除，但桌子位置會重設。')){state.map.background=null;state.map.aspect=null;state.map.hidden=false;state.tables.forEach(t=>{delete t.mapX;delete t.mapY});render();toast('場地底圖已移除')}};
 $('#closeSeatPreviewBtn').onclick=()=>$('#seatPreviewDialog').close();
 $('#printBtn').onclick=()=>window.print();
-$('#backupBtn').onclick=()=>download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),'排桌備份.json');
+function backupFilename(){const d=new Date(),pad=n=>String(n).padStart(2,'0');return `排桌備份_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`}
+$('#backupBtn').onclick=()=>download(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),backupFilename());
+$('#backupInput').onclick=e=>{e.currentTarget.value=''};
 $('#backupInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.groups||!x.tables)throw 0;state=x;render();toast('備份已讀取')}catch{toast('備份檔格式不正確')}};r.readAsText(f)};
-const exportPalette=['FCE8E8','E8F1EC','EEE9F5','F8ECDF','E6EFF5','F2EDE4','F2E8EC','E7F2F1'];
+
+function closeMobileTools(){if($('#mobileToolsDialog').open)$('#mobileToolsDialog').close()}
+$('#mobileToolsBtn').onclick=()=>{updateDeviceTime();$('#mobileToolsDialog').showModal()};
+$('#closeMobileToolsBtn').onclick=closeMobileTools;
+$('#mobileImportBtn').onclick=()=>{closeMobileTools();$('#openImportBtn').click()};
+$('#mobileBackupBtn').onclick=()=>{closeMobileTools();$('#backupBtn').click()};
+$('#mobileRestoreBtn').onclick=()=>{closeMobileTools();$('#backupInput').click()};
+$('#mobileImageBtn').onclick=()=>{closeMobileTools();$('#imageExportBtn').click()};
+$('#mobilePdfBtn').onclick=()=>{closeMobileTools();$('#printBtn').click()};
+$('#mobileExcelBtn').onclick=()=>{closeMobileTools();$('#exportBtn').click()};
+
+function setWaitingDrawer(open){$('.guest-panel').classList.toggle('mobile-open',open);$('#mobileDrawerBackdrop').classList.toggle('show',open);$('#mobileWaitingBtn').setAttribute('aria-expanded',String(open))}
+$('#mobileWaitingBtn').onclick=()=>setWaitingDrawer(!$('.guest-panel').classList.contains('mobile-open'));
+$('#mobileDrawerBackdrop').onclick=()=>setWaitingDrawer(false);
+
+function exportViewName(){return state.view==='venue'?'場地配置':state.view==='map'?'座位圖':'列表排桌'}
+async function exportImage(){
+  if(typeof html2canvas!=='function')return toast('圖片匯出元件尚未載入，請重新整理後再試一次');
+  const button=$('#imageExportBtn');button.disabled=true;button.textContent='產生圖片中…';
+  const stage=document.createElement('section'),board=$('#tableBoard').cloneNode(true),stats=$('.stats').cloneNode(true),viewName=exportViewName(),now=new Date();
+  stage.className=`image-export-stage export-${state.view}`;
+  stage.innerHTML=`<header class="image-export-header"><div class="image-export-title"><h2>好日子排桌｜${viewName}</h2><span>${now.toLocaleString('zh-TW')}</span></div></header>`;
+  stage.firstElementChild.append(stats);stage.append(board);
+  board.querySelectorAll('button,[draggable="true"]').forEach(el=>{el.removeAttribute('draggable');el.style.cursor='default'});
+  board.querySelectorAll('.map-chair.occupied').forEach(el=>{el.style.backgroundColor='#fff';el.style.backgroundImage='none'});
+  board.querySelectorAll('.table-tools,.map-settings,.map-move-handle,.venue-marker-settings,.drop-hint,.venue-empty').forEach(el=>el.remove());
+  if(state.view==='venue'&&state.map?.background){board.querySelector('.venue-background-image')?.remove();const image=document.createElement('img');image.className='venue-background-image';image.src=state.map.background;image.alt='飯店場地底圖';board.prepend(image);board.classList.add('venue-mode');board.classList.remove('venue-start');board.style.aspectRatio=String(state.map.aspect||1.5)}
+  document.body.append(stage);
+  try{
+    await Promise.all([...stage.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=img.onerror=resolve})));
+    const canvas=await html2canvas(stage,{backgroundColor:'#f6f0e8',scale:1.5,useCORS:true,logging:false,windowWidth:1700,scrollX:0,scrollY:0});
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png',.96));if(!blob)throw new Error('PNG 建立失敗');
+    const d=now.toISOString().slice(0,10);download(blob,`婚宴${viewName}_${d}.png`);toast(`已匯出${viewName}圖片`);
+  }catch(error){console.error(error);toast('圖片匯出失敗，請重新整理後再試一次')}
+  finally{stage.remove();button.disabled=false;button.textContent='匯出圖片'}
+}
+$('#imageExportBtn').onclick=exportImage;
+
 function addExportStyles(xml){
   const fontCount=Number(xml.match(/<fonts count="(\d+)"/)?.[1]||1),fillCount=Number(xml.match(/<fills count="(\d+)"/)?.[1]||2),borderCount=Number(xml.match(/<borders count="(\d+)"/)?.[1]||1),xfCount=Number(xml.match(/<cellXfs count="(\d+)"/)?.[1]||1);
-  const fills=[...exportPalette,'FFF2CC','FCE4D6','D9EAD3','A94F58'].map(color=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${color}"/><bgColor indexed="64"/></patternFill></fill>`).join('');
-  xml=xml.replace(/<fonts count="\d+">/,`<fonts count="${fontCount+1}">`).replace('</fonts>','<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Microsoft JhengHei"/></font></fonts>');
-  xml=xml.replace(/<fills count="\d+">/,`<fills count="${fillCount+exportPalette.length+4}">`).replace('</fills>',fills+'</fills>');
-  xml=xml.replace(/<borders count="\d+">/,`<borders count="${borderCount+1}">`).replace('</borders>',`<border><left/><right/><top style="thick"><color rgb="FFA94F58"/></top><bottom/><diagonal/></border></borders>`);
-  const xfs=[...exportPalette.map((_,i)=>`<xf numFmtId="0" fontId="0" fillId="${fillCount+i}" borderId="0" xfId="0" applyFill="1"/>`),
-    `<xf numFmtId="0" fontId="0" fillId="${fillCount+exportPalette.length}" borderId="0" xfId="0" applyFill="1"/>`,
-    `<xf numFmtId="0" fontId="0" fillId="${fillCount+exportPalette.length+1}" borderId="0" xfId="0" applyFill="1"/>`,
-    `<xf numFmtId="0" fontId="0" fillId="${fillCount+exportPalette.length+2}" borderId="0" xfId="0" applyFill="1"/>`,
-    `<xf numFmtId="0" fontId="${fontCount}" fillId="${fillCount+exportPalette.length+3}" borderId="0" xfId="0" applyFont="1" applyFill="1"/>`,
-    ...exportPalette.map((_,i)=>`<xf numFmtId="0" fontId="0" fillId="${fillCount+i}" borderId="${borderCount}" xfId="0" applyFill="1" applyBorder="1"/>`),
-    `<xf numFmtId="0" fontId="0" fillId="${fillCount+exportPalette.length}" borderId="${borderCount}" xfId="0" applyFill="1" applyBorder="1"/>`].join('');
-  xml=xml.replace(/<cellXfs count="\d+">/,`<cellXfs count="${xfCount+exportPalette.length*2+5}">`).replace('</cellXfs>',xfs+'</cellXfs>');
-  return {xml,styleBase:xfCount,headerStyle:xfCount+exportPalette.length+3,groupStyleBase:xfCount+exportPalette.length+4};
+  const fonts=[
+    '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Microsoft JhengHei"/></font>',
+    '<font><b/><sz val="16"/><color rgb="FF6F3038"/><name val="Microsoft JhengHei"/></font>',
+    '<font><sz val="10"/><color rgb="FF887873"/><name val="Microsoft JhengHei"/></font>',
+    '<font><b/><sz val="11"/><color rgb="FF3F302D"/><name val="Microsoft JhengHei"/></font>',
+    '<font><b/><sz val="11"/><color rgb="FF2F6B4F"/><name val="Microsoft JhengHei"/></font>',
+    '<font><b/><sz val="11"/><color rgb="FF9A5B08"/><name val="Microsoft JhengHei"/></font>',
+    '<font><b/><sz val="11"/><color rgb="FF9E3038"/><name val="Microsoft JhengHei"/></font>'
+  ];
+  const colors=['A94F58','FFFDFC','F7F1EC','F8ECEE','E8F2EC','FFF1D9','FBE7E8'];
+  const fills=colors.map(color=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${color}"/><bgColor indexed="64"/></patternFill></fill>`).join('');
+  const borders=[
+    '<border><left/><right/><top/><bottom style="thin"><color rgb="FFE6DAD1"/></bottom><diagonal/></border>',
+    '<border><left/><right/><top style="thin"><color rgb="FFD3BFB3"/></top><bottom style="thin"><color rgb="FFE6DAD1"/></bottom><diagonal/></border>',
+    '<border><left/><right/><top style="medium"><color rgb="FFA94F58"/></top><bottom style="thin"><color rgb="FFE6DAD1"/></bottom><diagonal/></border>'
+  ];
+  xml=xml.replace(/<fonts count="\d+">/,`<fonts count="${fontCount+fonts.length}">`).replace('</fonts>',fonts.join('')+'</fonts>');
+  xml=xml.replace(/<fills count="\d+">/,`<fills count="${fillCount+fills.length}">`).replace('</fills>',fills+'</fills>');
+  xml=xml.replace(/<borders count="\d+">/,`<borders count="${borderCount+borders.length}">`).replace('</borders>',borders.join('')+'</borders>');
+  const align='<alignment vertical="center"/>';
+  const centered='<alignment horizontal="center" vertical="center"/>';
+  const make=(font,fill,border,alignment=align)=>`<xf numFmtId="0" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${alignment}</xf>`;
+  const styles={};const xfs=[];const add=(name,xf)=>{styles[name]=xfCount+xfs.length;xfs.push(xf)};
+  add('header',make(fontCount,fillCount,borderCount,centered));
+  add('title',make(fontCount+1,fillCount+1,0));
+  add('subtitle',make(fontCount+2,fillCount+1,0));
+  add('detailLight',make(0,fillCount+1,borderCount));
+  add('detailAlt',make(0,fillCount+2,borderCount));
+  add('detailWaiting',make(0,fillCount+3,borderCount));
+  add('groupLight',make(fontCount+3,fillCount+1,borderCount+1));
+  add('groupAlt',make(fontCount+3,fillCount+2,borderCount+1));
+  add('groupWaiting',make(fontCount+3,fillCount+3,borderCount+1));
+  add('tableLight',make(fontCount+3,fillCount+1,borderCount+2));
+  add('tableAlt',make(fontCount+3,fillCount+2,borderCount+2));
+  add('tableWaiting',make(fontCount+3,fillCount+3,borderCount+2));
+  add('kpi',make(fontCount+3,fillCount+2,borderCount,centered));
+  add('statusGood',make(fontCount+4,fillCount+4,borderCount,centered));
+  add('statusWarn',make(fontCount+5,fillCount+5,borderCount,centered));
+  add('statusBad',make(fontCount+6,fillCount+6,borderCount,centered));
+  add('summaryNormal',make(0,fillCount+1,borderCount));
+  xml=xml.replace(/<cellXfs count="\d+">/,`<cellXfs count="${xfCount+xfs.length}">`).replace('</cellXfs>',xfs.join('')+'</cellXfs>');
+  return {xml,styles};
 }
-function paintSheetRows(xml,rowStyles,headerStyle,headerRows=[1],freezeRows=1){
+function paintSheetRows(xml,rowStyles,styles,headerRows=[1],freezeRows=1){
   xml=xml.replace(/<sheetView([^>]*)\/>/,`<sheetView$1><pane ySplit="${freezeRows}" topLeftCell="A${freezeRows+1}" activePane="bottomLeft" state="frozen"/></sheetView>`);
   return xml.replace(/<row\b[^>]*\br="(\d+)"[^>]*>[\s\S]*?<\/row>/g,(rowXml,rowNumber)=>{
-    const style=headerRows.includes(Number(rowNumber))?headerStyle:rowStyles[Number(rowNumber)];
+    const styleName=headerRows.includes(Number(rowNumber))?'header':rowStyles[Number(rowNumber)],style=styles[styleName];
     return style===undefined?rowXml:rowXml.replace(/<c\b(?![^>]*\bs=")[^>]*>/g,cell=>cell.replace('<c ',`<c s="${style}" `));
   });
 }
 async function buildStyledExport(workbook,resultRowStyles,summaryRowStyles){
   const zip=await JSZip.loadAsync(XLSX.write(workbook,{bookType:'xlsx',type:'array'}));
   const styleFile=zip.file('xl/styles.xml'),styleResult=addExportStyles(await styleFile.async('string'));zip.file('xl/styles.xml',styleResult.xml);
-  for(const [path,rowStyles,headerRows,freezeRows] of [['xl/worksheets/sheet1.xml',resultRowStyles,[1],1],['xl/worksheets/sheet2.xml',summaryRowStyles,[1,4],4]]){const file=zip.file(path);if(file){const resolvedStyles={};Object.entries(rowStyles).forEach(([row,style])=>resolvedStyles[row]=style&&typeof style==='object'?(style.group?styleResult.groupStyleBase:styleResult.styleBase)+style.palette:style);zip.file(path,paintSheetRows(await file.async('string'),resolvedStyles,styleResult.headerStyle,headerRows,freezeRows))}}
+  for(const [path,rowStyles,headerRows,freezeRows] of [['xl/worksheets/sheet1.xml',resultRowStyles,[4],4],['xl/worksheets/sheet2.xml',summaryRowStyles,[4,7],7]]){const file=zip.file(path);if(file)zip.file(path,paintSheetRows(await file.async('string'),rowStyles,styleResult.styles,headerRows,freezeRows))}
   return zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 $('#exportBtn').onclick=async()=>{
@@ -261,17 +337,18 @@ $('#exportBtn').onclick=async()=>{
   try{
     const headers=['桌次','分類','原始群組','姓名','兒童座椅','素食','備註','中式喜餅數量（群組合計）','西式喜餅數量（群組合計）'];
     const orderedSections=state.tables.map((table,index)=>({table,index,groups:state.groups.map(g=>({g,ms:g.members.filter(m=>m.tableId===table.id)})).filter(x=>x.ms.length)}));
-    orderedSections.push({table:null,index:exportPalette.length,groups:state.groups.map(g=>({g,ms:g.members.filter(m=>!m.tableId)})).filter(x=>x.ms.length)});
-    const data=[],resultRowStyles={},recordedGroupTotals=new Set();let excelRow=2;
-    orderedSections.forEach(section=>section.groups.forEach(({g,ms})=>ms.sort((a,b)=>(a.originalIndex||0)-(b.originalIndex||0)).forEach((m,memberIndex)=>{const firstGroupTotalRow=!recordedGroupTotals.has(g.id);if(firstGroupTotalRow)recordedGroupTotals.add(g.id);data.push([section.table?.name||'待分配',g.category,g.name,m.name,m.child?'是':'',m.veg?'是':'',g.note,firstGroupTotalRow?(g.cnCake||''):'',firstGroupTotalRow?(g.westCake||''):'']);resultRowStyles[excelRow++]={palette:section.table?section.index%exportPalette.length:exportPalette.length,group:memberIndex===0}})));
-    const resultSheet=XLSX.utils.aoa_to_sheet([headers,...data]);resultSheet['!autofilter']={ref:`A1:I${data.length+1}`};resultSheet['!cols']=[{wch:13},{wch:16},{wch:18},{wch:18},{wch:11},{wch:9},{wch:30},{wch:24},{wch:24}];resultSheet['!rows']=[{hpt:24}];
+    orderedSections.push({table:null,index:state.tables.length,groups:state.groups.map(g=>({g,ms:g.members.filter(m=>!m.tableId)})).filter(x=>x.ms.length)});
+    const data=[],resultRowStyles={},recordedGroupTotals=new Set();let excelRow=5;
+    orderedSections.forEach(section=>section.groups.forEach(({g,ms},groupIndex)=>ms.sort((a,b)=>(a.originalIndex||0)-(b.originalIndex||0)).forEach((m,memberIndex)=>{const firstGroupTotalRow=!recordedGroupTotals.has(g.id);if(firstGroupTotalRow)recordedGroupTotals.add(g.id);data.push([section.table?.name||'待分配',g.category,g.name,m.name,m.child?'是':'',m.veg?'是':'',g.note,firstGroupTotalRow?(g.cnCake||''):'',firstGroupTotalRow?(g.westCake||''):'']);const tone=section.table?(section.index%2?'Alt':'Light'):'Waiting',kind=memberIndex===0?(groupIndex===0?'table':'group'):'detail';resultRowStyles[excelRow++]=`${kind}${tone}`})));
+    const exportedAt=new Date(),exportedLabel=`匯出時間：${exportedAt.toLocaleString('zh-TW')}`;
+    const resultSheet=XLSX.utils.aoa_to_sheet([['婚宴排桌結果'],[exportedLabel],[],headers,...data]);resultSheet['!autofilter']={ref:`A4:I${data.length+4}`};resultSheet['!cols']=[{wch:13},{wch:15},{wch:18},{wch:18},{wch:11},{wch:9},{wch:28},{wch:20},{wch:20}];resultSheet['!rows']=[{hpt:28},{hpt:19},{hpt:8},{hpt:25},...data.map(()=>({hpt:22}))];resultSheet['!merges']=[XLSX.utils.decode_range('A1:I1'),XLSX.utils.decode_range('A2:I2')];resultRowStyles[1]='title';resultRowStyles[2]='subtitle';
     const summaryHeaders=['桌次','已安排','舒適人數','絕對上限','使用加位','狀態'];
     const summaryData=state.tables.map(t=>{const count=tableCount(t.id),extra=Math.max(0,count-t.comfort);return [t.name,count,t.comfort,t.hard,extra,count>t.hard?'超過上限':extra?'使用加位':count===t.comfort?'剛好坐滿':'舒適']});
     summaryData.push(['待分配',waitingCount,'','','',waitingCount?'尚未完成':'已完成']);
     const assignedCount=members().length-waitingCount,totalComfort=state.tables.reduce((sum,t)=>sum+t.comfort,0),totalHard=state.tables.reduce((sum,t)=>sum+t.hard,0),totalExtra=state.tables.reduce((sum,t)=>sum+Math.max(0,tableCount(t.id)-t.comfort),0);
     const globalHeaders=['賓客總數','已安排','待安排','舒適座位','最大容量','已用加位'],globalValues=[members().length,assignedCount,waitingCount,totalComfort,totalHard,totalExtra];
-    const summarySheet=XLSX.utils.aoa_to_sheet([globalHeaders,globalValues,[],summaryHeaders,...summaryData]);summarySheet['!autofilter']={ref:`A4:F${summaryData.length+4}`};summarySheet['!cols']=[{wch:14},{wch:13},{wch:13},{wch:13},{wch:13},{wch:14}];summarySheet['!rows']=[{hpt:24},{hpt:26},{hpt:9},{hpt:24}];
-    const summaryRowStyles={2:{palette:1,group:false}};summaryData.forEach((row,i)=>{summaryRowStyles[i+5]={palette:row[0]==='待分配'?exportPalette.length:(row[5]==='使用加位'||row[5]==='超過上限'?exportPalette.length+1:exportPalette.length+2),group:false}});
+    const summarySheet=XLSX.utils.aoa_to_sheet([['桌次統計'],[exportedLabel],[],globalHeaders,globalValues,[],summaryHeaders,...summaryData]);summarySheet['!autofilter']={ref:`A7:F${summaryData.length+7}`};summarySheet['!cols']=[{wch:15},{wch:13},{wch:13},{wch:13},{wch:13},{wch:15}];summarySheet['!rows']=[{hpt:28},{hpt:19},{hpt:8},{hpt:24},{hpt:28},{hpt:8},{hpt:24},...summaryData.map(()=>({hpt:22}))];summarySheet['!merges']=[XLSX.utils.decode_range('A1:F1'),XLSX.utils.decode_range('A2:F2')];
+    const summaryRowStyles={1:'title',2:'subtitle',5:'kpi'};summaryData.forEach((row,i)=>{summaryRowStyles[i+8]=row[5]==='超過上限'?'statusBad':(row[5]==='使用加位'||row[5]==='尚未完成')?'statusWarn':row[5]==='已完成'?'statusGood':'summaryNormal'});
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,resultSheet,'排桌結果');XLSX.utils.book_append_sheet(wb,summarySheet,'桌次統計');
     const blob=await buildStyledExport(wb,resultRowStyles,summaryRowStyles),date=new Date().toISOString().slice(0,10);download(blob,`婚宴排桌結果_${date}.xlsx`);toast(waitingCount?`已依桌次匯出；另有 ${waitingCount} 位待分配`:'已依桌次排序並匯出 Excel');
   }catch(error){console.error(error);toast('Excel 匯出失敗，請重新整理後再試一次')}
