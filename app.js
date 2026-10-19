@@ -243,6 +243,7 @@ $('#mobileImportBtn').onclick=()=>{closeMobileTools();$('#openImportBtn').click(
 $('#mobileBackupBtn').onclick=()=>{closeMobileTools();$('#backupBtn').click()};
 $('#mobileRestoreBtn').onclick=()=>{closeMobileTools();$('#backupInput').click()};
 $('#mobileImageBtn').onclick=()=>{closeMobileTools();$('#imageExportBtn').click()};
+$('#mobileLineImageBtn').onclick=()=>{closeMobileTools();$('#lineImageExportBtn').click()};
 $('#mobilePdfBtn').onclick=()=>{closeMobileTools();$('#printBtn').click()};
 $('#mobileExcelBtn').onclick=()=>{closeMobileTools();$('#exportBtn').click()};
 
@@ -272,6 +273,26 @@ async function exportImage(){
   finally{stage.remove();button.disabled=false;button.textContent='匯出圖片'}
 }
 $('#imageExportBtn').onclick=exportImage;
+
+function lineExportStats(){
+  const all=members(),assigned=all.filter(m=>m.tableId).length,comfort=state.tables.reduce((sum,t)=>sum+t.comfort,0),hard=state.tables.reduce((sum,t)=>sum+t.hard,0),extra=state.tables.reduce((sum,t)=>sum+Math.max(0,tableCount(t.id)-t.comfort),0);
+  return [['賓客總數',all.length],['已安排',assigned],['待安排',all.length-assigned],['舒適座位',comfort],['最大容量',hard],['已用加位',extra]];
+}
+function linePerson(m){return `<span class="line-person">${esc(m.name)}${m.child?'<b>👶 嬰兒椅</b>':''}${m.veg?'<b>🥬 素食</b>':''}</span>`}
+function lineGroup(g,people){return `<section class="line-group" style="--group-color:${groupColor(g)}"><div class="line-group-title"><strong>${esc(g.name)}</strong><span>${esc(g.category)} · ${people.length} 位</span></div><div class="line-people">${people.map(linePerson).join('')}</div></section>`}
+function lineTableCard(table){
+  const grouped=state.groups.map(g=>({g,people:g.members.filter(m=>m.tableId===table.id)})).filter(x=>x.people.length),count=tableCount(table.id);
+  return `<article class="line-table-card"><header class="line-table-head"><h2>${esc(table.name)}</h2><div><span class="line-table-count"><strong>${count}</strong><span> 人</span></span><span class="line-table-capacity">舒適 ${table.comfort}／最多 ${table.hard}</span></div></header><div class="line-table-groups">${grouped.length?grouped.map(x=>lineGroup(x.g,x.people)).join(''):'<span class="line-table-capacity">尚未安排賓客</span>'}</div></article>`;
+}
+async function exportLineImage(){
+  if(typeof html2canvas!=='function')return toast('圖片匯出元件尚未載入，請重新整理後再試一次');
+  const button=$('#lineImageExportBtn'),now=new Date(),waiting=state.groups.map(g=>({g,people:g.members.filter(m=>!m.tableId)})).filter(x=>x.people.length);button.disabled=true;button.textContent='產生分享圖…';
+  const stage=document.createElement('section');stage.className='line-export-stage';stage.innerHTML=`<header class="line-export-head"><div><h1>好日子排桌</h1><p>婚宴桌次與賓客名單</p></div><time>${now.toLocaleString('zh-TW')}</time></header><section class="line-export-stats">${lineExportStats().map(([label,value])=>`<div class="line-export-stat"><span>${label}</span><strong>${value}</strong></div>`).join('')}</section><main class="line-export-grid">${state.tables.map(lineTableCard).join('')}${waiting.length?`<article class="line-table-card line-export-waiting"><header class="line-table-head"><h2>待安排</h2><span class="line-table-count"><strong>${waiting.reduce((sum,x)=>sum+x.people.length,0)}</strong><span> 人</span></span></header><div class="line-table-groups">${waiting.map(x=>lineGroup(x.g,x.people)).join('')}</div></article>`:''}</main><footer class="line-export-foot">請以圖片上的更新時間辨識最新版本</footer>`;document.body.append(stage);
+  try{const canvas=await html2canvas(stage,{backgroundColor:'#f6f0e8',scale:1,useCORS:true,logging:false,windowWidth:1440,scrollX:0,scrollY:0});const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png',1));if(!blob)throw new Error('PNG 建立失敗');download(blob,`婚宴排桌_LINE分享圖_${now.toISOString().slice(0,10)}.png`);toast('已匯出 LINE 單張分享圖')}
+  catch(error){console.error(error);toast('LINE 分享圖匯出失敗，請重新整理後再試一次')}
+  finally{stage.remove();button.disabled=false;button.textContent='LINE 分享圖'}
+}
+$('#lineImageExportBtn').onclick=exportLineImage;
 
 function addExportStyles(xml){
   const fontCount=Number(xml.match(/<fonts count="(\d+)"/)?.[1]||1),fillCount=Number(xml.match(/<fills count="(\d+)"/)?.[1]||2),borderCount=Number(xml.match(/<borders count="(\d+)"/)?.[1]||1),xfCount=Number(xml.match(/<cellXfs count="(\d+)"/)?.[1]||1);
