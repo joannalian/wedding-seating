@@ -125,7 +125,7 @@
 
   <dialog id="manualDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>新增群組</h2><button class="icon-button" value="cancel">×</button></div><label>分類<input id="manualCategory" placeholder="例如：共同好友"></label><label>群組名稱<input id="manualName" placeholder="例如：同事朋友"></label><div class="two-cols"><label>人數<input id="manualCount" type="number" min="1" value="1"></label><label>備註<input id="manualNote"></label></div><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="saveManualBtn" class="button primary">新增</button></div></form></dialog>
 
-  <dialog id="personDialog"><form method="dialog" class="dialog-card"><div class="dialog-title"><h2>編輯賓客</h2><button class="icon-button" value="cancel">×</button></div><label>顯示姓名<input id="personName"></label><div class="two-cols"><label><input id="personChild" type="checkbox" style="width:auto"> 需要兒童座椅</label><label><input id="personVeg" type="checkbox" style="width:auto"> 素食</label></div><label>移動到<select id="personTableTarget" class="dialog-select"></select></label><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="savePersonBtn" class="button primary">儲存</button></div></form></dialog>
+  <dialog id="personDialog"><form id="personForm" class="dialog-card"><div class="dialog-title"><h2>編輯賓客</h2><button type="button" class="icon-button close-person-dialog" aria-label="關閉">×</button></div><label>顯示姓名<input id="personName"></label><div class="two-cols"><label><input id="personChild" type="checkbox" style="width:auto"> 需要兒童座椅</label><label><input id="personVeg" type="checkbox" style="width:auto"> 素食</label></div><label>移動到<select id="personTableTarget" class="dialog-select"></select></label><div class="dialog-actions"><button type="button" class="button ghost close-person-dialog">取消</button><button type="submit" id="savePersonBtn" class="button primary">儲存</button></div></form></dialog>
 
   <dialog id="groupMoveDialog"><form method="dialog" class="dialog-card mobile-sheet"><div class="dialog-title"><div><p class="eyebrow">群組操作</p><h2 id="groupMoveTitle">移動群組</h2></div><button class="icon-button" value="cancel">×</button></div><p class="hint" id="groupMoveHint"></p><label>移動到<select id="groupTableTarget" class="dialog-select"></select></label><div class="dialog-actions"><button value="cancel" class="button ghost">取消</button><button type="button" id="confirmGroupMoveBtn" class="button primary">確認移動</button></div></form></dialog>
 
@@ -136,6 +136,6 @@
   <script src="vendor/xlsx.full.min.js"></script>
   <script src="vendor/jszip.min.js"></script>
   <script src="vendor/html2canvas.min.js?v=20261005-1"></script>
-  <script src="app.js?v=20261019-1"></script>
+  <script src="app.js?v=20261021-1"></script>
 </body>
 </html>
