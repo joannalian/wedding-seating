@@ -2,6 +2,7 @@ const $ = (s) => document.querySelector(s);
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 const colors = ['#a94f58','#668575','#886d9c','#bd7a46','#547f9a','#8d7854','#8b5c67','#628d8a'];
 const key = 'wedding-seating-v1';
+const tableNameCollator = new Intl.Collator('zh-Hant-TW',{numeric:true,sensitivity:'base'});
 let state = load() || {
   groups: [],
   tables: [
@@ -14,6 +15,13 @@ let importRows = [], importPlan = null, editingTableId = null, editingMemberId =
 function load(){try{return JSON.parse(localStorage.getItem(key))}catch{return null}}
 function persist(){try{state.meta=state.meta||{};state.meta.updatedAt=new Date().toISOString();localStorage.setItem(key,JSON.stringify(state));updateDeviceTime()}catch{toast('場地圖或資料較大，瀏覽器儲存空間不足；請先下載備份。')}}
 function updateDeviceTime(){const el=$('#deviceUpdatedAt');if(!el)return;const value=state.meta?.updatedAt;el.textContent=value?`本機資料儲存時間：${new Date(value).toLocaleString('zh-TW')}`:'尚未儲存資料'}
+function sortTablesByName(){
+  state.tables.sort((a,b)=>{
+    const aMain=a.name.trim()==='主桌',bMain=b.name.trim()==='主桌';
+    if(aMain!==bMain)return aMain?-1:1;
+    return tableNameCollator.compare(a.name.trim(),b.name.trim());
+  });
+}
 function tableOptions(selected){return `<option value="">待分配</option>`+state.tables.map(t=>`<option value="${t.id}" ${t.id===selected?'selected':''}>${esc(t.name)}（${tableCount(t.id)}/${t.hard}）</option>`).join('')}
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 // Return the actual member objects so drag, edit, undo and table counts share one source of truth.
@@ -42,6 +50,7 @@ function makeGroup(row){
     members:Array.from({length:total},(_,i)=>({id:uid(),name:total===1?base:`${base}${i+1}`,originalIndex:i+1,child:i<child,veg:i<veg,tableId:null}))};
 }
 function render(){
+  sortTablesByName();
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));
   const all=members(), assigned=all.filter(m=>m.tableId).length, total=all.length;
   const comfort=state.tables.reduce((s,t)=>s+t.comfort,0), hard=state.tables.reduce((s,t)=>s+t.hard,0);
