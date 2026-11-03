@@ -255,7 +255,6 @@ $('#mobileImportBtn').onclick=()=>{closeMobileTools();$('#openImportBtn').click(
 $('#mobileBackupBtn').onclick=()=>{closeMobileTools();$('#backupBtn').click()};
 $('#mobileRestoreBtn').onclick=()=>{closeMobileTools();$('#backupInput').click()};
 $('#mobileImageBtn').onclick=()=>{closeMobileTools();$('#imageExportBtn').click()};
-$('#mobileLineImageBtn').onclick=()=>{closeMobileTools();$('#lineImageExportBtn').click()};
 $('#mobilePdfBtn').onclick=()=>{closeMobileTools();$('#printBtn').click()};
 $('#mobileExcelBtn').onclick=()=>{closeMobileTools();$('#exportBtn').click()};
 
@@ -285,26 +284,6 @@ async function exportImage(){
   finally{stage.remove();button.disabled=false;button.textContent='匯出圖片'}
 }
 $('#imageExportBtn').onclick=exportImage;
-
-function lineExportStats(){
-  const all=members(),assigned=all.filter(m=>m.tableId).length,comfort=state.tables.reduce((sum,t)=>sum+t.comfort,0),hard=state.tables.reduce((sum,t)=>sum+t.hard,0),extra=state.tables.reduce((sum,t)=>sum+Math.max(0,tableCount(t.id)-t.comfort),0);
-  return [['賓客總數',all.length],['已安排',assigned],['待安排',all.length-assigned],['舒適座位',comfort],['最大容量',hard],['已用加位',extra]];
-}
-function linePerson(m){return `<span class="line-person">${esc(m.name)}${m.child?'<b>👶 嬰兒椅</b>':''}${m.veg?'<b>🥬 素食</b>':''}</span>`}
-function lineGroup(g,people){return `<section class="line-group" style="--group-color:${groupColor(g)}"><div class="line-group-title"><strong>${esc(g.name)}</strong><span>${esc(g.category)} · ${people.length} 位</span></div><div class="line-people">${people.map(linePerson).join('')}</div></section>`}
-function lineTableCard(table){
-  const grouped=state.groups.map(g=>({g,people:g.members.filter(m=>m.tableId===table.id)})).filter(x=>x.people.length),count=tableCount(table.id);
-  return `<article class="line-table-card"><header class="line-table-head"><h2>${esc(table.name)}</h2><div><span class="line-table-count"><strong>${count}</strong><span> 人</span></span><span class="line-table-capacity">舒適 ${table.comfort}／最多 ${table.hard}</span></div></header><div class="line-table-groups">${grouped.length?grouped.map(x=>lineGroup(x.g,x.people)).join(''):'<span class="line-table-capacity">尚未安排賓客</span>'}</div></article>`;
-}
-async function exportLineImage(){
-  if(typeof html2canvas!=='function')return toast('圖片匯出元件尚未載入，請重新整理後再試一次');
-  const button=$('#lineImageExportBtn'),now=new Date(),waiting=state.groups.map(g=>({g,people:g.members.filter(m=>!m.tableId)})).filter(x=>x.people.length);button.disabled=true;button.textContent='產生分享圖…';
-  const stage=document.createElement('section');stage.className='line-export-stage';stage.innerHTML=`<header class="line-export-head"><div><h1>好日子排桌</h1><p>婚宴桌次與賓客名單</p></div><time>${now.toLocaleString('zh-TW')}</time></header><section class="line-export-stats">${lineExportStats().map(([label,value])=>`<div class="line-export-stat"><span>${label}</span><strong>${value}</strong></div>`).join('')}</section><main class="line-export-grid">${state.tables.map(lineTableCard).join('')}${waiting.length?`<article class="line-table-card line-export-waiting"><header class="line-table-head"><h2>待安排</h2><span class="line-table-count"><strong>${waiting.reduce((sum,x)=>sum+x.people.length,0)}</strong><span> 人</span></span></header><div class="line-table-groups">${waiting.map(x=>lineGroup(x.g,x.people)).join('')}</div></article>`:''}</main><footer class="line-export-foot">請以圖片上的更新時間辨識最新版本</footer>`;document.body.append(stage);
-  try{const canvas=await html2canvas(stage,{backgroundColor:'#f6f0e8',scale:1,useCORS:true,logging:false,windowWidth:1440,scrollX:0,scrollY:0});const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png',1));if(!blob)throw new Error('PNG 建立失敗');download(blob,`婚宴排桌_LINE分享圖_${now.toISOString().slice(0,10)}.png`);toast('已匯出 LINE 單張分享圖')}
-  catch(error){console.error(error);toast('LINE 分享圖匯出失敗，請重新整理後再試一次')}
-  finally{stage.remove();button.disabled=false;button.textContent='LINE 分享圖'}
-}
-$('#lineImageExportBtn').onclick=exportLineImage;
 
 function addExportStyles(xml){
   const fontCount=Number(xml.match(/<fonts count="(\d+)"/)?.[1]||1),fillCount=Number(xml.match(/<fills count="(\d+)"/)?.[1]||2),borderCount=Number(xml.match(/<borders count="(\d+)"/)?.[1]||1),xfCount=Number(xml.match(/<cellXfs count="(\d+)"/)?.[1]||1);
@@ -368,20 +347,20 @@ $('#exportBtn').onclick=async()=>{
   if(!members().length)return toast('目前沒有賓客資料可匯出');
   const button=$('#exportBtn'),waitingCount=members().filter(m=>!m.tableId).length;button.disabled=true;button.textContent='整理中…';
   try{
-    const headers=['桌次','分類','原始群組','姓名','兒童座椅','素食','備註','中式喜餅數量（群組合計）','西式喜餅數量（群組合計）'];
+    const headers=['桌次','桌子暱稱','分類','原始群組','姓名','兒童座椅','素食','備註','中式喜餅數量（群組合計）','西式喜餅數量（群組合計）'];
     const orderedSections=state.tables.map((table,index)=>({table,index,groups:state.groups.map(g=>({g,ms:g.members.filter(m=>m.tableId===table.id)})).filter(x=>x.ms.length)}));
     orderedSections.push({table:null,index:state.tables.length,groups:state.groups.map(g=>({g,ms:g.members.filter(m=>!m.tableId)})).filter(x=>x.ms.length)});
     const data=[],resultRowStyles={},recordedGroupTotals=new Set();let excelRow=5;
-    orderedSections.forEach(section=>section.groups.forEach(({g,ms},groupIndex)=>ms.sort((a,b)=>(a.originalIndex||0)-(b.originalIndex||0)).forEach((m,memberIndex)=>{const firstGroupTotalRow=!recordedGroupTotals.has(g.id);if(firstGroupTotalRow)recordedGroupTotals.add(g.id);data.push([section.table?.name||'待分配',g.category,g.name,m.name,m.child?'是':'',m.veg?'是':'',g.note,firstGroupTotalRow?(g.cnCake||''):'',firstGroupTotalRow?(g.westCake||''):'']);const tone=section.table?(section.index%2?'Alt':'Light'):'Waiting',kind=memberIndex===0?(groupIndex===0?'table':'group'):'detail';resultRowStyles[excelRow++]=`${kind}${tone}`})));
+    orderedSections.forEach(section=>section.groups.forEach(({g,ms},groupIndex)=>ms.sort((a,b)=>(a.originalIndex||0)-(b.originalIndex||0)).forEach((m,memberIndex)=>{const firstGroupTotalRow=!recordedGroupTotals.has(g.id);if(firstGroupTotalRow)recordedGroupTotals.add(g.id);data.push([section.table?.name||'待分配',section.table?.nickname||'',g.category,g.name,m.name,m.child?'是':'',m.veg?'是':'',g.note,firstGroupTotalRow?(g.cnCake||''):'',firstGroupTotalRow?(g.westCake||''):'']);const tone=section.table?(section.index%2?'Alt':'Light'):'Waiting',kind=memberIndex===0?(groupIndex===0?'table':'group'):'detail';resultRowStyles[excelRow++]=`${kind}${tone}`})));
     const exportedAt=new Date(),exportedLabel=`匯出時間：${exportedAt.toLocaleString('zh-TW')}`;
-    const resultSheet=XLSX.utils.aoa_to_sheet([['婚宴排桌結果'],[exportedLabel],[],headers,...data]);resultSheet['!autofilter']={ref:`A4:I${data.length+4}`};resultSheet['!cols']=[{wch:13},{wch:15},{wch:18},{wch:18},{wch:11},{wch:9},{wch:28},{wch:20},{wch:20}];resultSheet['!rows']=[{hpt:28},{hpt:19},{hpt:8},{hpt:25},...data.map(()=>({hpt:22}))];resultSheet['!merges']=[XLSX.utils.decode_range('A1:I1'),XLSX.utils.decode_range('A2:I2')];resultRowStyles[1]='title';resultRowStyles[2]='subtitle';
-    const summaryHeaders=['桌次','已安排','舒適人數','絕對上限','使用加位','狀態'];
-    const summaryData=state.tables.map(t=>{const count=tableCount(t.id),extra=Math.max(0,count-t.comfort);return [t.name,count,t.comfort,t.hard,extra,count>t.hard?'超過上限':extra?'使用加位':count===t.comfort?'剛好坐滿':'舒適']});
-    summaryData.push(['待分配',waitingCount,'','','',waitingCount?'尚未完成':'已完成']);
+    const resultSheet=XLSX.utils.aoa_to_sheet([['婚宴排桌結果'],[exportedLabel],[],headers,...data]);resultSheet['!autofilter']={ref:`A4:J${data.length+4}`};resultSheet['!cols']=[{wch:13},{wch:18},{wch:15},{wch:18},{wch:18},{wch:11},{wch:9},{wch:28},{wch:20},{wch:20}];resultSheet['!rows']=[{hpt:28},{hpt:19},{hpt:8},{hpt:25},...data.map(()=>({hpt:22}))];resultSheet['!merges']=[XLSX.utils.decode_range('A1:J1'),XLSX.utils.decode_range('A2:J2')];resultRowStyles[1]='title';resultRowStyles[2]='subtitle';
+    const summaryHeaders=['桌次','桌子暱稱','已安排','舒適人數','絕對上限','使用加位','狀態'];
+    const summaryData=state.tables.map(t=>{const count=tableCount(t.id),extra=Math.max(0,count-t.comfort);return [t.name,t.nickname||'',count,t.comfort,t.hard,extra,count>t.hard?'超過上限':extra?'使用加位':count===t.comfort?'剛好坐滿':'舒適']});
+    summaryData.push(['待分配','',waitingCount,'','','',waitingCount?'尚未完成':'已完成']);
     const assignedCount=members().length-waitingCount,totalComfort=state.tables.reduce((sum,t)=>sum+t.comfort,0),totalHard=state.tables.reduce((sum,t)=>sum+t.hard,0),totalExtra=state.tables.reduce((sum,t)=>sum+Math.max(0,tableCount(t.id)-t.comfort),0);
     const globalHeaders=['賓客總數','已安排','待安排','舒適座位','最大容量','已用加位'],globalValues=[members().length,assignedCount,waitingCount,totalComfort,totalHard,totalExtra];
-    const summarySheet=XLSX.utils.aoa_to_sheet([['桌次統計'],[exportedLabel],[],globalHeaders,globalValues,[],summaryHeaders,...summaryData]);summarySheet['!autofilter']={ref:`A7:F${summaryData.length+7}`};summarySheet['!cols']=[{wch:15},{wch:13},{wch:13},{wch:13},{wch:13},{wch:15}];summarySheet['!rows']=[{hpt:28},{hpt:19},{hpt:8},{hpt:24},{hpt:28},{hpt:8},{hpt:24},...summaryData.map(()=>({hpt:22}))];summarySheet['!merges']=[XLSX.utils.decode_range('A1:F1'),XLSX.utils.decode_range('A2:F2')];
-    const summaryRowStyles={1:'title',2:'subtitle',5:'kpi'};summaryData.forEach((row,i)=>{summaryRowStyles[i+8]=row[5]==='超過上限'?'statusBad':(row[5]==='使用加位'||row[5]==='尚未完成')?'statusWarn':row[5]==='已完成'?'statusGood':'summaryNormal'});
+    const summarySheet=XLSX.utils.aoa_to_sheet([['桌次統計'],[exportedLabel],[],globalHeaders,globalValues,[],summaryHeaders,...summaryData]);summarySheet['!autofilter']={ref:`A7:G${summaryData.length+7}`};summarySheet['!cols']=[{wch:15},{wch:18},{wch:13},{wch:13},{wch:13},{wch:13},{wch:15}];summarySheet['!rows']=[{hpt:28},{hpt:19},{hpt:8},{hpt:24},{hpt:28},{hpt:8},{hpt:24},...summaryData.map(()=>({hpt:22}))];summarySheet['!merges']=[XLSX.utils.decode_range('A1:G1'),XLSX.utils.decode_range('A2:G2')];
+    const summaryRowStyles={1:'title',2:'subtitle',5:'kpi'};summaryData.forEach((row,i)=>{summaryRowStyles[i+8]=row[6]==='超過上限'?'statusBad':(row[6]==='使用加位'||row[6]==='尚未完成')?'statusWarn':row[6]==='已完成'?'statusGood':'summaryNormal'});
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,resultSheet,'排桌結果');XLSX.utils.book_append_sheet(wb,summarySheet,'桌次統計');
     const blob=await buildStyledExport(wb,resultRowStyles,summaryRowStyles),date=new Date().toISOString().slice(0,10);download(blob,`婚宴排桌結果_${date}.xlsx`);toast(waitingCount?`已依桌次匯出；另有 ${waitingCount} 位待分配`:'已依桌次排序並匯出 Excel');
   }catch(error){console.error(error);toast('Excel 匯出失敗，請重新整理後再試一次')}
